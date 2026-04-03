@@ -17,20 +17,48 @@
 #include <math.h>
 #include <string.h>
 
-int main(int argc, char** argv) {
-  if (argc < 2) {
-    printf("%s: missing arguments\n", argv[0]);
-    return 1;
-  }
+#define numColors 256
+#define startHue 50
+#define endHue 0
+#define startVal 0
+#define endVal 100
 
-  const char* atoiError;
-  const unsigned int numColors = strtonum(argv[1], 2, 4294967295, &atoiError);
-  if (atoiError != NULL) {
-    printf("%s: %s\n", argv[0], atoiError);
-    return 1;
-  }
+unsigned int hsv_to_rgb(double hue, double sat, double val) {
+  double c = val * sat;
+  double x = c * (1 - fabs(fmod(hue / 60, 2) - 1));
+  double m = val - c;
 
-  printf("%i\n", numColors);
+  double convertMatrix[][3] = {
+    {c, x, 0},
+    {x, c, 0},
+    {0, c, x},
+    {0, x, c},
+    {x, 0, c},
+    {c, 0, x}
+  };
 
+  double* rgb_prime = convertMatrix[(unsigned char) round(hue / 60)];
+
+  unsigned char r = (unsigned char) ((rgb_prime[0] + m) * 255);
+  unsigned char g = (unsigned char) ((rgb_prime[1] + m) * 255);
+  unsigned char b = (unsigned char) ((rgb_prime[2] + m) * 255);
+
+  printf("%i,%i,%i\n", r, g, b);
+  printf("%lf, %lf, %lf\n", c, x, m);
+
+  unsigned int output = 0;
+
+  output |= r;
+  output |= g * 256;
+  output |= b * 65536;
+
+  return output;
+}
+
+int main() {
+  unsigned int rgb = hsv_to_rgb(235, 0.66, 0.58);
+  FILE* fp = fopen("test.bin", "w");
+  fwrite(&rgb, sizeof(unsigned int), 1, fp);
+  fclose(fp);
   return 0;
 }
