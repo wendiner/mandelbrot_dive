@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+
+<!--
+
+palette_demo.html
+by wendiner, 2026
+GNU General Public License v3.0
+
+Used to demo gradient palettes created by palette_creator.c
+
+-->
+
+<html>
+  <body>
+    <canvas id="display" width="256" height="256"></canvas>
+    <input id="drop" type="file" />
+
+    <script>
+      document.querySelector("#drop").addEventListener("change", async e => {
+        let fr = new FileReader();
+        await new Promise(r => {
+          fr.addEventListener("load", r);
+          fr.readAsArrayBuffer(e.target.files[0]);
+        });
+
+        let fileData = new Uint8Array(fr.result);
+
+        let ctx = document.querySelector("#display").getContext("2d");
+        let img = ctx.createImageData(256, 256);
+        
+        for (let i = 0; i < img.data.length; i++)
+          img.data[i] = fileData[11 + Math.floor(i / 1024) * 4 + i % 4];
+
+        ctx.putImageData(img, 0, 0);
+      });
+    </script>
+  </body>
+</html>

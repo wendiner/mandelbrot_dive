@@ -16,13 +16,15 @@
 #include <pthread.h>
 
 #define nproc 12
-#define dispWidth 512
-#define dispHeight 512
+#define dispWidth 640
+#define dispHeight 480
 #define startX -0.343806077
 #define startY -0.61127804
 #define desiredZoom 30000
+#define maxFrames 60000000
 
 #include <allegro5/allegro5.h>
+#include <allegro5/allegro_image.h>
 
 unsigned int testPoint(double x, double y, unsigned int maxDepth) { // check if a point is within the set
   double z[] = {0.0, 0.0};
@@ -40,7 +42,7 @@ unsigned int testPoint(double x, double y, unsigned int maxDepth) { // check if 
     bool repeat = false;
     for (int i = 0; i <= maxDepth; i++) // checking for repeats
       if (z_hist[i * 2] == z[0] && z_hist[i * 2 + 1] == z[1]) {
-        iterations = 0;
+        iterations = maxDepth;
         repeat = true;
       }
 
@@ -59,9 +61,12 @@ unsigned int pixelData[dispWidth * dispHeight]; // calculated number of iteratio
 double centerX = startX;
 double centerY = startY;
 double zoom = 80;
-unsigned int maxIts = 80; // max depth for the iterative function
+unsigned int maxIts = 200; // max depth for the iterative function
 int threadsDone = nproc; // used to prevent multithreading issues
 bool adjustIts = true;
+bool recenter = true;
+unsigned int frameCount = 0;
+
 
 void indToCoords(unsigned int ind, double* res) {
   res[0] = centerX - dispWidth / 2 / zoom + (ind % dispWidth) / zoom;
@@ -82,9 +87,14 @@ void* slaveLabor(void* ass) { // first time using multithreading so I gave it a 
   return 0;
 }
 
-int main() {
+int main(int argc, char** argv) {
     if(!al_init()) {
       printf("couldn't initialize allegro\n");
+      return 1;
+    }
+
+    if (!al_init_image_addon()) {
+      printf("couldn't initialize image addon\n");
       return 1;
     }
 
@@ -121,6 +131,21 @@ int main() {
       assignments[i][1] = (i == nproc - 1) ? (dispWidth * dispHeight - 1) : (dispWidth * dispHeight / nproc * i);
     }
 
+    FILE* fp = fopen("./palettes/palette.bin", "r");
+    if (!fp) {
+      printf("failed to open palette file\n");
+      return 1;
+    }
+
+    for (int i = 0; i < 7; i++) // skip magic number
+      fgetc(fp);
+
+    unsigned int paletteLength;
+    fread(&paletteLength, sizeof(unsigned int), 1, fp);
+    printf("Palette length: %i\n", paletteLength);
+    unsigned int* palette = (unsigned int*) malloc(paletteLength * sizeof(unsigned int));
+    fread(palette, sizeof(unsigned int), paletteLength, fp);
+    
     al_start_timer(timer);
     while(1) {
       al_wait_for_event(queue, &event);
@@ -133,6 +158,11 @@ int main() {
           if (threadsActive) {
             threadsActive = false;
 
+            if (frameCount >= maxFrames) {
+              done = true;
+              break;
+            }
+
             if (zoom > desiredZoom && adjustIts) {
               bool colors[maxIts] = {};
               unsigned int variety = 0;
@@ -142,16 +172,16 @@ int main() {
                   variety++;
                 }
               
-              if (variety < 30) {
+              if (variety < paletteLength * 3 / 4) { // prevents black pixels
                 printf("Increasing depth!\n");
-                maxIts += 5;
+                maxIts += 10;
                 break;
               }
             }
             
             printf("Centered at (%lf, %lf)\n", centerX, centerY);
 
-            if (zoom > desiredZoom) {
+            if (zoom > desiredZoom && recenter) { // finds a good place to recenter
               unsigned int best = 0; // largest value in pixel data
               unsigned int holder = 0; // index of said value
               for (int i = 0; i < dispWidth * dispHeight; i++) {
@@ -179,7 +209,7 @@ int main() {
             
             printf("Max depth: %i\n", maxIts);
 
-            zoom *= 2;
+            zoom *= 1.5;
             printf("Zoom: %lf\n", zoom);
 
             redraw = true;
@@ -196,14 +226,14 @@ int main() {
           break;
       }
 
-      if(done)
+      if (done)
           break;
 
-      if(redraw) {
+      if (redraw) {
         // histogram plotting based on
         // https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set#Histogram_coloring
         unsigned int numIterationsPerPixel[maxIts + 1];
-        for (unsigned int i = 0; i <= maxIts; i++)
+        for (unsigned int i = 0; i < maxIts + 1; i++)
           numIterationsPerPixel[i] = 0;
         for (int i = 0; i < dispWidth * dispHeight; i++)
           numIterationsPerPixel[pixelData[i]]++;
@@ -221,21 +251,28 @@ int main() {
 
         al_clear_to_color(al_map_rgb(0, 0, 0));
         ALLEGRO_BITMAP* bmp = al_get_backbuffer(disp);
+
         for (int i = 0; i < dispHeight; i++) {
-          ALLEGRO_LOCKED_REGION* lock = al_lock_bitmap_region(bmp, 0, i, dispWidth, 1, ALLEGRO_PIXEL_FORMAT_RGBA_8888, ALLEGRO_LOCK_WRITEONLY);
-          unsigned char* data = (unsigned char*)lock->data;
-          for (int j = 0; j < dispWidth * 4; j += 4) {
-            unsigned int val = (unsigned int) (hues[i * dispWidth + j / 4] * 16777216);
-            
-            data[j] = 255;
-            data[j + 3] = val % 256;
-            data[j + 2] = val / 256 % 256;
-            data[j + 1] = val / (256 * 256) % 256;
+          ALLEGRO_LOCKED_REGION* lock = al_lock_bitmap_region(bmp, 0, i, dispWidth, 1, ALLEGRO_PIXEL_FORMAT_ABGR_8888, ALLEGRO_LOCK_WRITEONLY);
+          unsigned int* data = (unsigned int*)lock->data;
+          for (int j = 0; j < dispWidth; j++) {
+            double val = hues[i * dispWidth + j];
+            data[j] = palette[(unsigned int) (val * (paletteLength - 1))];
           }
 
           al_unlock_bitmap(bmp);
         }
+
+        char leadingZeroes[255];
+        char filename[255];
+        unsigned int places = (unsigned int) log10(maxFrames) + 1;
+        snprintf(leadingZeroes, 255, "./frames/frame-%%0%ii.png", places);
+        snprintf(filename, 255, leadingZeroes, frameCount);
+
+        al_save_bitmap(filename, bmp);
         al_flip_display();
+
+        frameCount++;
 
         redraw = false;
       }
@@ -244,6 +281,8 @@ int main() {
     al_destroy_display(disp);
     al_destroy_timer(timer);
     al_destroy_event_queue(queue);
+    
+    free(palette);
 
     return 0;
 }
