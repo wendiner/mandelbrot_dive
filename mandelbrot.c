@@ -18,10 +18,10 @@
 #define nproc 12
 #define dispWidth 640
 #define dispHeight 480
-#define startX -0.343806077
-#define startY -0.61127804
-#define desiredZoom 30000
-#define maxFrames 60000000
+#define startX -0.2262668651137611
+#define startY -1.1161741857870029
+#define desiredZoom 300000
+#define maxFrames 300
 
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_image.h>
@@ -64,8 +64,13 @@ double zoom = 80;
 unsigned int maxIts = 200; // max depth for the iterative function
 int threadsDone = nproc; // used to prevent multithreading issues
 bool adjustIts = true;
-bool recenter = true;
+bool recenter = false;
 unsigned int frameCount = 0;
+
+unsigned int lastBlacks = dispWidth * dispHeight;
+unsigned int blacks = 0;
+double lastCheck = 0;
+bool firstAdjust = true;
 
 
 void indToCoords(unsigned int ind, double* res) {
@@ -80,6 +85,8 @@ void* slaveLabor(void* ass) { // first time using multithreading so I gave it a 
     double xy[2];
     indToCoords(i, xy);
     unsigned int its = testPoint(xy[0], xy[1], maxIts);
+    if (its == maxIts)
+      blacks++;
     pixelData[i] = its;
   }
 
@@ -163,23 +170,22 @@ int main(int argc, char** argv) {
               break;
             }
 
-            if (zoom > desiredZoom && adjustIts) {
-              bool colors[maxIts] = {};
-              unsigned int variety = 0;
-              for (unsigned int i = 0; i < dispWidth * dispHeight; i++)
-                if (!colors[pixelData[i]]) {
-                  colors[pixelData[i]] = true;
-                  variety++;
-                }
-              
-              if (variety < paletteLength * 9 / 10) { // prevents black pixels
+            printf("Blacks: %i\n", blacks);
+            if (zoom > desiredZoom && adjustIts && blacks > dispWidth * dispHeight / 20 && zoom > lastCheck * 4) {
+              printf("Too many blacks!\n");
+              if ((double) (lastBlacks - blacks) / (double) (dispWidth * dispHeight) > 0.002 || firstAdjust) {
+                firstAdjust = false;
                 printf("Increasing depth!\n");
                 maxIts += 20;
                 break;
+              } else {
+                printf("Done increasing depth.\n");
+                lastCheck = zoom;
+                firstAdjust = true;
               }
             }
             
-            printf("Centered at (%lf, %lf)\n", centerX, centerY);
+            printf("Centered at (%25.16lf, %25.16lf)\n", centerX, centerY);
 
             if (zoom > desiredZoom && recenter) { // finds a good place to recenter
               unsigned int best = 0; // largest value in pixel data
@@ -202,20 +208,24 @@ int main(int argc, char** argv) {
                 if (newXY[0] != centerX && newXY[1] != centerY) {
                   centerX = newXY[0];
                   centerY = newXY[1];
-                  printf("Recentered at (%lf, %lf)\n", centerX, centerY);
+                  printf("Recentered at (%25.16lf, %25.16lf)\n", centerX, centerY);
                 }
               }
             }
             
             printf("Max depth: %i\n", maxIts);
 
-            zoom *= 1.5;
+            zoom *= 1.1;
             printf("Zoom: %lf\n", zoom);
 
             redraw = true;
           } else {
             threadsActive = true;
             threadsDone = 0;
+
+            lastBlacks = blacks;
+            blacks = 0;
+
             for (int i = 0; i < nproc; i++)
               pthread_create(threadIDs[i], NULL, slaveLabor, assignments[i]);
           }
@@ -271,6 +281,7 @@ int main(int argc, char** argv) {
 
         al_save_bitmap(filename, bmp);
         al_flip_display();
+        printf("Now viewing: %s\n", filename);
 
         frameCount++;
 
