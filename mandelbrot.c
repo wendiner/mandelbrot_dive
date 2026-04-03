@@ -172,9 +172,9 @@ int main(int argc, char** argv) {
                   variety++;
                 }
               
-              if (variety < paletteLength * 3 / 4) { // prevents black pixels
+              if (variety < paletteLength * 9 / 10) { // prevents black pixels
                 printf("Increasing depth!\n");
-                maxIts += 10;
+                maxIts += 20;
                 break;
               }
             }
