@@ -18,10 +18,10 @@
 #define nproc 12
 #define dispWidth 640
 #define dispHeight 480
-#define startX -0.2262668651137611
-#define startY -1.1161741857870029
-#define desiredZoom 300000
-#define maxFrames 300
+#define startX -1.768778833
+#define startY 0.001738996
+#define desiredZoom 1585714676
+#define maxFrames 600000000
 
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_image.h>
@@ -64,7 +64,7 @@ double zoom = 80;
 unsigned int maxIts = 200; // max depth for the iterative function
 int threadsDone = nproc; // used to prevent multithreading issues
 bool adjustIts = true;
-bool recenter = false;
+bool recenter = true;
 unsigned int frameCount = 0;
 
 unsigned int lastBlacks = dispWidth * dispHeight;
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
             }
 
             printf("Blacks: %i\n", blacks);
-            if (zoom > desiredZoom && adjustIts && blacks > dispWidth * dispHeight / 20 && zoom > lastCheck * 4) {
+            if (adjustIts && blacks > dispWidth * dispHeight / 20 && zoom > lastCheck * 4) {
               printf("Too many blacks!\n");
               if ((double) (lastBlacks - blacks) / (double) (dispWidth * dispHeight) > 0.002 || firstAdjust) {
                 firstAdjust = false;
