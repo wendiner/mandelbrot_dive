@@ -12,7 +12,7 @@ Used to demo gradient palettes created by palette_creator.c
 
 <html>
   <body>
-    <canvas id="display" width="256" height="256"></canvas>
+    <canvas id="display" style="border: 1px solid #000;" width="256" height="256"></canvas>
     <input id="drop" type="file" />
 
     <script>
@@ -24,12 +24,16 @@ Used to demo gradient palettes created by palette_creator.c
         });
 
         let fileData = new Uint8Array(fr.result);
+        let numColors = new DataView(fr.result).getUint32(7, true);
+        console.log(`Showing palette with ${numColors} colors!`);
+        let can = document.querySelector("#display");
+        can.setAttribute("height", numColors);
 
-        let ctx = document.querySelector("#display").getContext("2d");
-        let img = ctx.createImageData(256, 256);
+        let ctx = can.getContext("2d");
+        let img = ctx.createImageData(256, numColors);
         
         for (let i = 0; i < img.data.length; i++)
-          img.data[i] = fileData[11 + Math.floor(i / 1024) * 4 + i % 4];
+          img.data[i] = fileData[11 + Math.floor(i / 1024) * 4 + i % 4]; // 1024 == width * 4
 
         ctx.putImageData(img, 0, 0);
       });

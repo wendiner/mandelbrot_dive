@@ -2,10 +2,11 @@
 // by wendiner, 2026
 // GNU General Public License v3.0
 //
-// Creates a gradient palette of variable size by
-// converting HSV values into RGB.
-// Outputs a file named "palette.bin" with the
-// following format:
+// Creates a gradient palette of variable size
+// (second argument) by interpolating HSV colors
+// and them converting them to RGB. The output
+// is written to a file (first argument) with
+// the following format:
 //
 // 00-06: "PALETTE"
 // 07-0a: length (32-bit unsigned int, little-endian)
@@ -15,10 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <string.h>
-
-// how granular is the gradient?
-const unsigned int numColors = 256;
 
 // HSV keyframes
 #define hsv_len 4
@@ -61,11 +58,18 @@ unsigned int hsv_to_rgb(double hue, double sat, double val, double alpha) {
 }
 
 int main(int argc, char** argv) {
-  FILE* fp = fopen("palette.bin", "w");
-  if (!fp) {
-    printf("%s: failed to open file\n", argv[0]);
+  if (argc < 3) {
+    printf("missing arguments\n");
     return 1;
   }
+
+  FILE* fp = fopen(argv[1], "w");
+  if (!fp) {
+    printf("failed to open file\n");
+    return 1;
+  }
+
+  unsigned int numColors = atoi(argv[2]); // how granular is the gradient?
 
   fprintf(fp, "PALETTE"); // magic number
   fwrite(&numColors, sizeof(unsigned int), 1, fp); // number of colors

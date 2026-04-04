@@ -18,10 +18,11 @@
 #define nproc 12
 #define dispWidth 640
 #define dispHeight 480
-#define startX -1.768778833
-#define startY 0.001738996
+#define startX -1.7687788413300589
+#define startY 0.0017390075777981
 #define desiredZoom 1585714676
 #define maxFrames 600000000
+#define palettePath "./palettes/heatmap_1024.bin"
 
 #include <allegro5/allegro5.h>
 #include <allegro5/allegro_image.h>
@@ -64,7 +65,7 @@ double zoom = 80;
 unsigned int maxIts = 200; // max depth for the iterative function
 int threadsDone = nproc; // used to prevent multithreading issues
 bool adjustIts = true;
-bool recenter = true;
+bool recenter = false;
 unsigned int frameCount = 0;
 
 unsigned int lastBlacks = dispWidth * dispHeight;
@@ -138,7 +139,7 @@ int main(int argc, char** argv) {
       assignments[i][1] = (i == nproc - 1) ? (dispWidth * dispHeight - 1) : (dispWidth * dispHeight / nproc * i);
     }
 
-    FILE* fp = fopen("./palettes/palette.bin", "r");
+    FILE* fp = fopen(palettePath, "r");
     if (!fp) {
       printf("failed to open palette file\n");
       return 1;
